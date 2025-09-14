@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Markdown移动端预览工具 · 京言",
-  description: "将输出的Markdown内容一键渲染为高保真移动端AI聊天框预览",
+  title: "Markdown 转 AI 聊天界面预览",
+  description: "将 Markdown 内容一键渲染为高保真移动端 AI 聊天界面预览，所见即所得，支持截图导出，适合演示、评审与分享。",
 };
 
 export default function RootLayout({

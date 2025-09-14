@@ -34,7 +34,7 @@ export default function InputPanel({
         {/* 标题和侧边栏切换按钮 */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex flex-col">
-            <h2 className="text-base font-semibold text-gray-900 tracking-tight">编辑区</h2>
+            <h2 className="text-base font-semibold text-gray-900 tracking-tight">编辑区域</h2>
           </div>
           {onToggleSidebar && (
             <button
