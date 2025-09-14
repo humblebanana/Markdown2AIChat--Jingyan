@@ -24,3 +24,274 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Shimmer loading animation for placeholder images */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ProductCard组件样式 - 基于线上设计规范 */
+
+/* 基础CSS变量定义 - 调整为线上实际尺寸 */
+:root {
+  --price-color: #ff1a2d;
+  --light-font-color: #fa1942;
+  --gray-font-color: #888b94;
+  --text-color-main: #1a1a1a;
+  --adm-font-size-4: 12px;
+  --adm-font-size-5: 13px;
+  --adm-font-size-6: 14px;
+  --adm-font-size-7: 15px;
+  --adm-font-size-8: 16px;
+  --adm-color-text: #333;
+  --adm-color-text-secondary: #666;
+  --adm-color-weak: #999;
+  --scale-factor: 1;
+}
+
+/* ProductCard主容器 */
+.skus-wrap {
+  display: flex;
+  position: relative;
+  width: 100%;
+  font-family: "-apple-system,Helvetica,sans-serif,Microsoft Yahei";
+  font-size: 18px;
+  line-height: normal;
+  color: #000;
+  padding: 2px 0 0;
+}
+
+/* Swiper容器样式 */
+.adm-swiper {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.adm-swiper-track {
+  display: flex;
+  width: 100%;
+}
+
+.adm-swiper-track-inner {
+  display: flex;
+  width: 100%;
+  transition: transform 0.3s ease;
+}
+
+.adm-swiper-slide {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.adm-swiper-item {
+  width: 100%;
+}
+
+/* 商品卡片容器 */
+.sku-item-wrap {
+  width: 100%;
+}
+
+.normal-product-card-container {
+  display: flex;
+  width: 100%;
+  background: #fff;
+  padding: 2px;
+  gap: 2px;
+}
+
+/* 商品图片区域 */
+.main-img-view {
+  flex-shrink: 0;
+  width: 110px;
+  height: 110px;
+}
+
+.sku-img-c {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.sku-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sku-img-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+/* 商品内容区域 */
+.content-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 0;
+  gap: 3px;
+}
+
+/* 商品标题区域 */
+.main-title {
+  flex: 0 0 auto;
+  margin-left: 5px;
+}
+
+.main_container {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+  font-size: var(--adm-font-size-6);
+  color: var(--text-color-main);
+  font-weight: 500;
+  max-height: calc(1.4em * 2);
+}
+
+/* 品牌标签 */
+.tags {
+  display: inline;
+}
+
+.tags_element_container {
+  display: inline-block;
+  margin-right: 2px;
+  vertical-align: top;
+}
+
+.icon_tag {
+  width: 30px;
+  height: 15px;
+  vertical-align: top;
+  border-radius: 3px;
+}
+
+/* 种草理由 */
+.reason {
+  font-size: var(--adm-font-size-4);
+  line-height: 1.3;
+  margin: 2px 0 0 4px;
+  color: rgb(140, 140, 140);
+}
+
+/* 标签行 */
+.tagsLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 2px 0 4px 0;
+  min-height: 18px;
+}
+
+.tags_element {
+  flex: 1;
+}
+
+/* AI评价 */
+.ai_comment {
+  display: flex;
+  align-items: center;
+  font-size: var(--adm-font-size-4);
+  color: var(--light-font-color);
+  cursor: pointer;
+  gap: 1px;
+}
+
+.ai_comment .arrow {
+  width: 10px;
+  height: 10px;
+  opacity: 0.8;
+}
+
+/* 价格区域 */
+.priceLine {
+  margin-top: auto;
+}
+
+.price_element {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.price_element_container {
+  display: flex;
+  align-items: flex-end;
+  margin-left: 5px;
+  gap: 6px;
+  flex: 1;
+}
+
+.main_price {
+  display: flex;
+  align-items: flex-end;
+}
+
+.price_container {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.price_unit {
+  font-size: var(--adm-font-size-5);
+  color: var(--price-color);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.price_number {
+  font-size: var(--adm-font-size-8);
+  color: var(--price-color);
+  font-weight: 700;
+  line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, "Segoe UI", Arial, Roboto, sans-serif;
+}
+
+.sub_price {
+  font-size: var(--adm-font-size-4);
+  color: var(--adm-color-text-secondary);
+  line-height: 1.2;
+  margin-left: 4px;
+}
+
+/* 关闭导航图标样式 */
+.close-nav-icon {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-nav-icon img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.close-nav-icon.touch:hover {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
