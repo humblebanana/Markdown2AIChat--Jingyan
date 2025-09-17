@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProductCardProps } from '@/types/product';
+import Shimmer from '@/components/ui/Shimmer';
 
 /**
  * 商品卡片组件
@@ -22,11 +23,11 @@ export default function ProductCard({ product, showDebugBounds = false }: Produc
                     {/* 商品图片区域 */}
                     <div className="main-img-view">
                       <div className="sku-img-c">
-                        <img
+                        <Shimmer
+                          width="100%"
+                          height="100%"
+                          borderRadius="6px"
                           className="sku-img sku-img-new"
-                          src={product.imageUrl}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'fill' }}
                         />
                         <div className="sku-img-mask"></div>
                       </div>

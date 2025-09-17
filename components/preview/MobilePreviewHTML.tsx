@@ -3,10 +3,10 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { RenderedElement } from '@/types/markdown';
 import MobileInputBar from './MobileInputBar';
 import ProductCard from '@/components/product/ProductCard';
 import { getProductMockData } from '@/lib/product/productUtils';
+import { useCanvasTransform } from '@/hooks/use-canvas-transform';
 
 // 通用SKU检测和渲染函数
 const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false): React.ReactNode => {
@@ -14,24 +14,27 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
   const childrenString = React.Children.toArray(children)
     .map(child => {
       if (typeof child === 'string') return child;
-      if (React.isValidElement(child) && child.props.children) {
-        return typeof child.props.children === 'string' ? child.props.children : '';
+      if (React.isValidElement<{ children?: React.ReactNode }>(child) && child.props.children) {
+        return typeof child.props.children === 'string' ? (child.props.children as string) : '';
       }
       return '';
     })
     .join('');
 
   // 检查是否包含sku_id格式的链接
-  const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>(\d+)<\/sku_id>\)/g;
+  const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)/g;
   const matches = childrenString.match(skuLinkRegex);
   
   if (matches && matches.length > 0) {
     // 解析每个匹配项
-    const parts = [];
+    type SkuPart = { type: 'sku_card'; skuId: string; title: string };
+    type TextPart = { type: 'text'; content: string };
+    type Part = SkuPart | TextPart;
+    const parts: Part[] = [];
     let lastIndex = 0;
     let match;
     
-    const regex = /\[([^\]]+)\]\(<sku_id>(\d+)<\/sku_id>\)/g;
+    const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)/g;
     while ((match = regex.exec(childrenString)) !== null) {
       // 添加匹配前的文本
       if (match.index > lastIndex) {
@@ -92,9 +95,14 @@ interface MobilePreviewHTMLProps {
   queryValue?: string; // 用户查询内容
   isLoading?: boolean;
   showDebugBounds?: boolean;
-  previewMode?: 'single' | 'full'; // 预览模式：单屏或全屏
+  previewMode?: 'single' | 'full' | 'canvas'; // 预览模式：单屏、全屏或画布模式
+  canvasViewMode?: 'single' | 'full'; // 画布模式下的内部视图模式
   showSidebar?: boolean; // 侧边栏显示状态，用于计算可用空间
   sidebarWidth?: number; // 侧边栏宽度百分比，用于精确计算缩放
+  // 画布控制回调
+  onScaleChange?: (scale: number) => void;
+  onResetView?: () => void;
+  onFitToView?: () => void;
 }
 
 /**
@@ -107,11 +115,92 @@ export default function MobilePreviewHTML({
   isLoading = false,
   showDebugBounds = false,
   previewMode = 'single',
+  canvasViewMode = 'single',
   showSidebar = true,
-  sidebarWidth = 50
+  sidebarWidth = 50,
+  onScaleChange,
+  onResetView,
+  onFitToView
 }: MobilePreviewHTMLProps) {
-  
+
   const isSingleMode = previewMode === 'single';
+  const isCanvasMode = previewMode === 'canvas';
+  // 在画布模式下，实际的显示模式由canvasViewMode决定
+  const effectiveViewMode = isCanvasMode ? canvasViewMode : previewMode;
+  const isEffectiveSingle = effectiveViewMode === 'single';
+
+  // 画布变换Hook
+  const canvasTransform = useCanvasTransform(
+    isCanvasMode ? 1 : 1, // 初始缩放
+    0, // 初始X偏移
+    0, // 初始Y偏移
+    isCanvasMode // 是否为画布模式
+  );
+
+  // 通知父组件缩放变化
+  React.useEffect(() => {
+    if (isCanvasMode && onScaleChange) {
+      onScaleChange(canvasTransform.transform.scale);
+    }
+  }, [canvasTransform.transform.scale, isCanvasMode, onScaleChange]);
+
+  // 画布模式下视图模式切换时锚定到手机预览组件顶部
+  React.useEffect(() => {
+    if (isCanvasMode && canvasTransform.canvasRef.current) {
+      // 延迟执行，确保DOM已更新
+      const timeoutId = setTimeout(() => {
+        const canvasElement = canvasTransform.canvasRef.current;
+        if (!canvasElement) return;
+
+        // 找到手机框架元素
+        const mobileFrame = canvasElement.querySelector('.mobile-device-frame') as HTMLElement;
+        if (mobileFrame) {
+          // 获取手机框架相对于画布容器的位置
+          const canvasRect = canvasElement.getBoundingClientRect();
+          const frameRect = mobileFrame.getBoundingClientRect();
+
+          // 计算需要的偏移量，使手机框架顶部对齐到画布容器的顶部（加上一些边距）
+          const targetOffsetY = 50; // 距离顶部50px的边距
+          const currentOffsetY = frameRect.top - canvasRect.top;
+          const adjustmentY = targetOffsetY - currentOffsetY;
+
+          // 只有在需要较大调整时才执行（避免微小的抖动）
+          if (Math.abs(adjustmentY) > 10) {
+            // 平滑调整视图位置
+            const currentTransform = canvasTransform.transform;
+            const newTranslateY = currentTransform.translateY + adjustmentY;
+
+            // 使用画布变换的内部方法调整位置
+            canvasTransform.updateTransform({
+              ...currentTransform,
+              translateY: newTranslateY
+            });
+          }
+        }
+      }, 100); // 100ms延迟确保DOM更新完成
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [canvasViewMode, isCanvasMode]); // 只依赖基本值，避免对象引用导致的不稳定
+
+  // 暴露画布控制功能给全局window对象
+  React.useEffect(() => {
+    if (isCanvasMode) {
+      (window as any).__canvasZoomIn = canvasTransform.zoomIn;
+      (window as any).__canvasZoomOut = canvasTransform.zoomOut;
+      (window as any).__canvasFitToView = () => {
+        const containerWidth = showSidebar ?
+          window.innerWidth * (100 - sidebarWidth) / 100 - 60 : window.innerWidth - 60;
+        const containerHeight = window.innerHeight - 200;
+        canvasTransform.fitToView(containerWidth, containerHeight, 390, 844);
+      };
+    } else {
+      // 清理全局函数
+      delete (window as any).__canvasZoomIn;
+      delete (window as any).__canvasZoomOut;
+      delete (window as any).__canvasFitToView;
+    }
+  }, [isCanvasMode, canvasTransform.zoomIn, canvasTransform.zoomOut, canvasTransform.fitToView, showSidebar, sidebarWidth]);
   
   // 计算全屏模式的缩放比例 - 确保完整内容可见
   const getScaleRatio = () => {
@@ -135,22 +224,72 @@ export default function MobilePreviewHTML({
     return Number(ratio.toFixed(2));
   };
   
-  const scaleRatio = !isSingleMode ? getScaleRatio() : 1;
-  
+  const scaleRatio = !isSingleMode && !isCanvasMode ? getScaleRatio() : 1;
+
   return (
-    <div className={`flex justify-center bg-gray-100 mobile-preview-container transition-all duration-300 ${ 
-      isSingleMode ? 'h-full items-start' : 'min-h-full items-start overflow-y-auto p-2'
-    }`}> 
+    <div
+      className={`mobile-preview-container transition-all duration-300 ${
+        isCanvasMode
+          ? 'h-full w-full overflow-hidden relative bg-gray-100'
+          : `flex justify-center bg-gray-100 ${
+              isSingleMode ? 'h-full items-start' : 'min-h-full items-start overflow-y-auto p-2'
+            }`
+      }`}
+      {...(isCanvasMode ? {
+        ref: canvasTransform.canvasRef,
+        onMouseDown: canvasTransform.handleMouseDown,
+        style: {
+          cursor: canvasTransform.isDragging ? 'grabbing' : 'default',
+          backgroundColor: '#f3f4f6' // 与其他模式保持一致的背景色
+        }
+      } : {})}
+    >
+      {/* 画布模式的网格背景 */}
+      {isCanvasMode && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `
+              radial-gradient(circle, #d1d5db 1px, transparent 1px)
+            `,
+            backgroundSize: '20px 20px',
+            backgroundPosition: '10px 10px',
+            opacity: 0.3
+          }}
+        />
+      )}
+
       {/* 手机框架容器 */}
       <div
         className={`relative flex flex-col bg-white overflow-hidden mobile-device-frame transition-all duration-300 ${
           isSingleMode
             ? 'rounded-2xl shadow-2xl'
+            : isCanvasMode
+            ? 'rounded-2xl shadow-2xl'
             : 'rounded-lg shadow-lg'
         }`}
         style={{
           fontFamily: 'Microsoft YaHei, 微软雅黑, -apple-system, Helvetica, sans-serif',
-          ...(isSingleMode
+          ...(isCanvasMode ? {
+            // 画布模式：根据canvasViewMode决定尺寸
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: '390px',
+            minWidth: '390px',
+            ...(isEffectiveSingle ? {
+              height: '844px',
+              minHeight: '844px',
+              marginTop: '-422px', // 高度的一半
+            } : {
+              height: 'auto',
+              minHeight: 'auto',
+              maxHeight: 'none',
+              marginTop: '-50px', // 动态高度时的简单偏移
+            }),
+            ...canvasTransform.getTransformStyle(),
+            marginLeft: '-195px', // 宽度的一半
+          } : isSingleMode
             ? {
                 width: '390px',
                 height: '844px',
@@ -187,15 +326,15 @@ export default function MobilePreviewHTML({
       </div>
 
       {/* 消息滚动视图 */}
-      <div 
-        className={`bg-gray-100 ${ 
-          isSingleMode 
-            ? 'flex-1 overflow-y-auto' 
+      <div
+        className={`bg-gray-100 ${
+          isEffectiveSingle
+            ? 'flex-1 overflow-y-auto'
             : 'overflow-visible'
         }`}
-        style={{ 
+        style={{
           backgroundColor: 'rgb(255, 255, 255)',
-          paddingBottom: isSingleMode ? '83px' : '0' // 为输入框预留空间
+          paddingBottom: isEffectiveSingle ? '83px' : '0' // 为输入框预留空间
         }}
         data-role="mobile-scrollview"
       >
@@ -273,13 +412,13 @@ export default function MobilePreviewHTML({
                                 {renderWithSkuCards(children, showDebugBounds)}
                               </h3>
                             ),
-                            p: ({ children }) => {
+                            p: ({ children }: { children?: React.ReactNode }) => {
                               // 将children转换为字符串来检查
                               const childrenString = React.Children.toArray(children)
                                 .map(child => {
                                   if (typeof child === 'string') return child;
-                                  if (React.isValidElement(child) && child.props.children) {
-                                    return typeof child.props.children === 'string' ? child.props.children : '';
+                                  if (React.isValidElement<{ children?: React.ReactNode }>(child) && child.props.children) {
+                                    return typeof child.props.children === 'string' ? (child.props.children as string) : '';
                                   }
                                   return '';
                                 })
@@ -289,7 +428,7 @@ export default function MobilePreviewHTML({
                               console.log('Paragraph string:', childrenString);
                               
                               // 检查是否包含sku_id格式的链接
-                              const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>(\d+)<\/sku_id>\)/g;
+                              const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)/g;
                               
                               const matches = childrenString.match(skuLinkRegex);
                               
@@ -297,11 +436,14 @@ export default function MobilePreviewHTML({
                                 console.log('Found SKU links in paragraph:', matches);
                                 
                                 // 解析每个匹配项
-                                const parts = [];
+                                type SkuPart = { type: 'sku_card'; skuId: string; title: string };
+                                type TextPart = { type: 'text'; content: string };
+                                type Part = SkuPart | TextPart;
+                                const parts: Part[] = [];
                                 let lastIndex = 0;
                                 let match;
                                 
-                                const regex = /\[([^\]]+)\]\(<sku_id>(\d+)<\/sku_id>\)/g;
+                                const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)/g;
                                 while ((match = regex.exec(childrenString)) !== null) {
                                   // 添加匹配前的文本
                                   if (match.index > lastIndex) {
@@ -453,7 +595,7 @@ export default function MobilePreviewHTML({
       </div>
 
       {/* 条件渲染的移动端输入框 */}
-      {isSingleMode && <MobileInputBar />}
+      {isEffectiveSingle && <MobileInputBar />}
       
       </div>
     </div>

@@ -33,9 +33,13 @@ export default function Home() {
   const [sidebarWidth, setSidebarWidth] = useState(33);
   const [isResizing, setIsResizing] = useState(false);
   
-  const [previewMode, setPreviewMode] = useState<'single' | 'full'>('single');
-  // 预览模式状态（单屏/全屏）
+  const [previewMode, setPreviewMode] = useState<'single' | 'full' | 'canvas'>('single');
+  // 预览模式状态（单屏/全屏/画布）
   const [showShortcutHint, setShowShortcutHint] = useState(true);
+
+  // 画布模式状态
+  const [canvasScale, setCanvasScale] = useState(1);
+  const [canvasViewMode, setCanvasViewMode] = useState<'single' | 'full'>('single'); // 画布内的视图模式
 
   // 客户端平台检测状态
   const [isMac, setIsMac] = useState(false);
@@ -99,6 +103,9 @@ export default function Home() {
     setIsSaving(true);
     console.log('📸 [截图] 开始高质量截图流程...');
 
+    // 画布模式特殊处理：临时容器变量
+    let tempContainer: HTMLElement | null = null;
+
     try {
       // 查找目标元素 - 手机框架容器
       const mobileFrame = document.querySelector('.mobile-device-frame') as HTMLElement;
@@ -116,16 +123,16 @@ export default function Home() {
 
       // 是否为全屏缩放模式（不对真实DOM做任何可见修改，使用克隆样式覆盖）
       const isScaled = previewMode === 'full';
+      const isCanvasMode = previewMode === 'canvas';
 
       // 📌 导出范围与视口信息
       // 目标：导出当前可视区域，而不是始终从内容顶部开始
-      const isSingle = previewMode === 'single';
+      const isSingle = previewMode === 'single' || (previewMode === 'canvas' && canvasViewMode === 'single');
       const viewportWidth = mobileFrame.clientWidth;
       const viewportHeight = mobileFrame.clientHeight;
 
-      // 定位可滚动容器与其内容
-      const scroller = mobileFrame.querySelector('[data-role="mobile-scrollview"]') as HTMLElement | null;
-      const scrollContent = scroller?.querySelector('[data-role="mobile-scrollcontent"]') as HTMLElement | null;
+      // 画布模式特殊处理：创建临时容器避免视觉闪动
+      let screenshotTarget = mobileFrame;
 
       // 记录原始状态，便于恢复
       const scrollAdjust = {
@@ -135,6 +142,52 @@ export default function Home() {
         originalScrollTop: 0,
       };
 
+      // 画布模式特殊处理：临时重置transform
+      const canvasAdjust = {
+        applied: false,
+        originalTransform: '',
+        originalPosition: '',
+        originalTop: '',
+        originalLeft: '',
+        originalMarginTop: '',
+        originalMarginLeft: '',
+      };
+
+      if (isCanvasMode) {
+        console.log('🎨 [截图] 画布模式：创建临时截图容器...');
+        canvasAdjust.applied = true;
+
+        // 创建临时容器，位置在屏幕外
+        tempContainer = document.createElement('div');
+        tempContainer.style.position = 'fixed';
+        tempContainer.style.top = '-10000px';
+        tempContainer.style.left = '-10000px';
+        tempContainer.style.pointerEvents = 'none';
+        tempContainer.style.zIndex = '-9999';
+
+        // 克隆手机框架
+        const clonedFrame = mobileFrame.cloneNode(true) as HTMLElement;
+
+        // 重置克隆元素的样式为截图友好的样式
+        clonedFrame.style.transform = 'none';
+        clonedFrame.style.position = 'static';
+        clonedFrame.style.top = 'auto';
+        clonedFrame.style.left = 'auto';
+        clonedFrame.style.marginTop = '0';
+        clonedFrame.style.marginLeft = '0';
+        clonedFrame.style.visibility = 'visible';
+
+        tempContainer.appendChild(clonedFrame);
+        document.body.appendChild(tempContainer);
+
+        // 使用克隆元素进行截图
+        screenshotTarget = clonedFrame;
+      }
+
+      // 定位可滚动容器与其内容（使用截图目标）
+      const scroller = screenshotTarget.querySelector('[data-role="mobile-scrollview"]') as HTMLElement | null;
+      const scrollContent = scroller?.querySelector('[data-role="mobile-scrollcontent"]') as HTMLElement | null;
+
       if (isSingle && scroller && scrollContent) {
         // 在截图前，将滚动偏移“转化”为内容的负向位移
         // 这样克隆DOM时即便滚动位置不被保留，视觉上仍可获得当前视口内容
@@ -143,17 +196,22 @@ export default function Home() {
         scrollAdjust.originalTransform = scrollContent.style.transform;
         scrollAdjust.originalScrollTop = scroller.scrollTop;
 
-        // 隐藏以避免用户看到瞬时跳动
-        const originalVisibilityLocal = mobileFrame.style.visibility;
-        mobileFrame.style.visibility = 'hidden';
+        // 隐藏以避免用户看到瞬时跳动（仅当不是画布模式时）
+        let originalVisibilityLocal = '';
+        if (!isCanvasMode) {
+          originalVisibilityLocal = mobileFrame.style.visibility;
+          mobileFrame.style.visibility = 'hidden';
+        }
 
         scroller.style.overflow = 'hidden';
         scroller.scrollTop = 0; // 避免库重置滚动产生影响
         scrollContent.style.transform = `translateY(-${scrollAdjust.originalScrollTop}px)`;
 
-        // 强制重绘并恢复可视
-        mobileFrame.offsetHeight;
-        mobileFrame.style.visibility = originalVisibilityLocal;
+        // 强制重绘并恢复可视（仅当不是画布模式时）
+        if (!isCanvasMode) {
+          mobileFrame.offsetHeight;
+          mobileFrame.style.visibility = originalVisibilityLocal;
+        }
       }
 
       // 📸 临时添加截图优化样式
@@ -176,11 +234,11 @@ export default function Home() {
       document.head.appendChild(screenshotOptimizationStyle);
 
       console.log('📏 [截图] 截图时尺寸:', {
-        width: mobileFrame.offsetWidth,
-        height: mobileFrame.offsetHeight,
+        width: screenshotTarget.offsetWidth,
+        height: screenshotTarget.offsetHeight,
         viewportWidth,
         viewportHeight,
-        scrollHeight: mobileFrame.scrollHeight,
+        scrollHeight: screenshotTarget.scrollHeight,
         innerScrollTop: scroller?.scrollTop || 0,
       });
 
@@ -197,21 +255,21 @@ export default function Home() {
 
       let dataURL: string | null = null;
 
+      // 计算捕获尺寸（单屏：固定844px；全屏：实际内容高度）
+      const captureWidth = 390; // 固定宽度
+      const captureHeight = isSingle ? 844 : screenshotTarget.scrollHeight;
+
       // 🎯 方案1: html-to-image (主要方案) - 针对移动端优化
       try {
         console.log('🚀 [截图] 尝试 html-to-image (移动端优化)...');
 
-        const captureWidth = isSingle ? viewportWidth : 390;
-        const captureHeight = isSingle ? viewportHeight : mobileFrame.scrollHeight;
-        const options:any = {
+        const options: Parameters<typeof htmlToImage.toPng>[1] = {
           quality: 1.0,
           backgroundColor: '#ffffff', // 纯白背景，避免灰色干扰
           pixelRatio: 2, // 2倍分辨率，确保清晰度
           width: captureWidth,
           height: captureHeight,
           cacheBust: true,
-          useCORS: true,
-          allowTaint: true,
           filter: (node: HTMLElement) => {
             // 过滤掉可能的滚动条和干扰元素
             if (node.nodeType === Node.ELEMENT_NODE) {
@@ -233,11 +291,10 @@ export default function Home() {
             transformOrigin: 'initial',
             overflow: 'hidden', // 隐藏可能的滚动条
             scrollbarWidth: 'none', // 隐藏滚动条(Firefox)
-            msOverflowStyle: 'none', // 隐藏滚动条(IE)
           }
         };
 
-        dataURL = await htmlToImage.toPng(mobileFrame, options);
+        dataURL = await htmlToImage.toPng(screenshotTarget, options);
         console.log('✅ [截图] html-to-image 成功!');
 
       } catch (htmlToImageError) {
@@ -247,7 +304,7 @@ export default function Home() {
         try {
           console.log('🔄 [截图] 尝试 modern-screenshot...');
 
-          const canvas = await domToCanvas(mobileFrame, {
+          const canvas = await domToCanvas(screenshotTarget, {
             backgroundColor: '#f3f4f6',
             scale: 2, // 2倍缩放确保质量
             quality: 1.0,
@@ -265,7 +322,7 @@ export default function Home() {
           try {
             console.log('🔄 [截图] 尝试 html-to-image 简化配置...');
 
-            dataURL = await htmlToImage.toPng(mobileFrame, {
+            dataURL = await htmlToImage.toPng(screenshotTarget, {
               quality: 0.9,
               backgroundColor: '#f3f4f6',
               pixelRatio: 1,
@@ -287,6 +344,13 @@ export default function Home() {
         scroller.style.overflow = scrollAdjust.originalOverflow;
         scrollContent.style.transform = scrollAdjust.originalTransform;
         scroller.scrollTop = scrollAdjust.originalScrollTop;
+      }
+
+      // 清理画布模式的临时容器
+      if (tempContainer) {
+        console.log('🎨 [截图] 画布模式：清理临时容器...');
+        document.body.removeChild(tempContainer);
+        tempContainer = null;
       }
 
       // 🧹 清理截图优化样式
@@ -347,6 +411,17 @@ export default function Home() {
         errorScreenshotStyle.remove();
       }
 
+      // 清理画布模式的临时容器（错误情况下）
+      if (tempContainer) {
+        console.log('🎨 [截图-错误] 清理临时容器...');
+        try {
+          document.body.removeChild(tempContainer);
+        } catch (e) {
+          console.warn('清理临时容器失败:', e);
+        }
+        tempContainer = null;
+      }
+
       // 用户友好的错误处理
       if (errorMessage.includes('找不到移动端预览容器')) {
         alert(`${errorMessage}\n\n💡 建议：\n1. 确保已输入Markdown内容\n2. 等待页面完全加载\n3. 检查移动端预览是否正常显示`);
@@ -354,6 +429,16 @@ export default function Home() {
         alert(`截图保存失败: ${errorMessage}\n\n🛠️ 可以尝试：\n1. 切换到单屏模式再尝试截图\n2. 刷新页面后重试\n3. 使用浏览器截图功能：\n   • Chrome: F12 → 选择元素 → 右键 → "Capture node screenshot"\n   • Firefox: F12 → 截图工具`);
       }
     } finally {
+      // 清理画布模式的临时容器（最终清理）
+      if (tempContainer) {
+        console.log('🎨 [截图-最终] 清理临时容器...');
+        try {
+          document.body.removeChild(tempContainer);
+        } catch (e) {
+          console.warn('最终清理临时容器失败:', e);
+        }
+      }
+
       setIsSaving(false);
     }
   };
@@ -372,6 +457,15 @@ export default function Home() {
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         setPreviewMode('full');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setPreviewMode('canvas');
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        // 从画布模式退出到单屏模式
+        if (previewMode === 'canvas') {
+          setPreviewMode('single');
+        }
       }
     };
 
@@ -532,7 +626,97 @@ export default function Home() {
                   </svg>
                   全屏
                 </button>
+                <button
+                  onClick={() => setPreviewMode('canvas')}
+                  title="画布模式 - 自由缩放和拖拽"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                    previewMode === 'canvas'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2M16 4h2a2 2 0 012 2v2M16 20h2a2 2 0 002-2v-2M9 12h6M12 9l3 3-3 3" />
+                  </svg>
+                  画布
+                </button>
               </div>
+
+              {/* 画布模式专用控件 */}
+              {previewMode === 'canvas' && (
+                <>
+                  <div className="w-px h-5 bg-gray-200"></div>
+
+                  {/* 画布内视图模式切换 */}
+                  <div className="flex items-center bg-gray-50 rounded-md p-0.5">
+                    <button
+                      onClick={() => setCanvasViewMode('single')}
+                      title="画布单屏模式"
+                      className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-all duration-200 ${
+                        canvasViewMode === 'single'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      单屏
+                    </button>
+                    <button
+                      onClick={() => setCanvasViewMode('full')}
+                      title="画布全屏模式"
+                      className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-all duration-200 ${
+                        canvasViewMode === 'full'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      全屏
+                    </button>
+                  </div>
+
+                  <div className="w-px h-5 bg-gray-200"></div>
+
+                  {/* 缩放控制 */}
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => (window as any).__canvasZoomOut?.()}
+                      title="缩小 (Ctrl + -)"
+                      className="flex items-center justify-center w-8 h-8 text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-md transition-all duration-200"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                      </svg>
+                    </button>
+
+                    <div className="flex items-center space-x-1 text-sm font-medium text-gray-700 min-w-[50px] justify-center">
+                      <span>{Math.round(canvasScale * 100)}%</span>
+                    </div>
+
+                    <button
+                      onClick={() => (window as any).__canvasZoomIn?.()}
+                      title="放大 (Ctrl + +)"
+                      className="flex items-center justify-center w-8 h-8 text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-md transition-all duration-200"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="w-px h-5 bg-gray-200"></div>
+
+                  {/* 视图适应控制 */}
+                  <button
+                    onClick={() => (window as any).__canvasFitToView?.()}
+                    title="适应窗口大小"
+                    className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-md transition-all duration-200"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    适应窗口
+                  </button>
+                </>
+              )}
 
               {/* 分隔线 */}
               <div className="w-px h-5 bg-gray-200"></div>
@@ -578,28 +762,34 @@ export default function Home() {
           </div>
           
           {/* 预览内容区域 */}
-          <div className={`flex-1 ${previewMode === 'single' ? 'overflow-hidden' : 'overflow-y-auto'} relative`}>
+          <div className={`flex-1 ${previewMode === 'single' ? 'overflow-hidden' : previewMode === 'canvas' ? 'overflow-hidden' : 'overflow-y-auto'} relative`}>
             <MobilePreviewHTML
               markdownContent={markdownValue}
               queryValue={queryValue}
               isLoading={isProcessing}
               showDebugBounds={showDebugBounds}
               previewMode={previewMode}
+              canvasViewMode={canvasViewMode}
               showSidebar={showSidebar}
               sidebarWidth={sidebarWidth}
+              onScaleChange={setCanvasScale}
+              onResetView={() => {}}
+              onFitToView={() => {}}
             />
-            {/* 角落轻提示：Notion风格，首次自动显示，常态极淡，悬停更清晰 */}
+            {/* 角落轻提示：Notion风格，固定在右下角 */}
             <div
-              className={`hidden md:flex items-center gap-1 absolute bottom-2 right-2 
-              text-[12px] text-gray-600 select-none transition-opacity 
-              ${showShortcutHint ? 'opacity-90' : 'opacity-90 hover:opacity-100'}`}
+              className={`hidden md:flex items-center gap-1 fixed bottom-4 right-4 z-50
+              text-[12px] text-gray-600 select-none transition-opacity
+              ${showShortcutHint ? 'opacity-90' : 'opacity-70 hover:opacity-100'}`}
               aria-hidden="true"
               title="使用键盘快捷键切换视图"
             >
-              <span className="px-1.5 py-0.5 border border-gray-300 bg-white rounded">{isMac ? '⌘' : 'Ctrl'}</span>
-              <span className="px-1.5 py-0.5 border border-gray-300 bg-white rounded">←</span>
+              <span className="px-1.5 py-0.5 border border-gray-300 bg-white rounded shadow-sm">{isMac ? '⌘' : 'Ctrl'}</span>
+              <span className="px-1.5 py-0.5 border border-gray-300 bg-white rounded shadow-sm">←</span>
               <span className="text-gray-400">/</span>
-              <span className="px-1.5 py-0.5 border border-gray-300 bg-white rounded">→</span>
+              <span className="px-1.5 py-0.5 border border-gray-300 bg-white rounded shadow-sm">→</span>
+              <span className="text-gray-400">/</span>
+              <span className="px-1.5 py-0.5 border border-gray-300 bg-white rounded shadow-sm">↑</span>
               <span className="ml-1 text-gray-500">切换视图</span>
             </div>
           </div>
