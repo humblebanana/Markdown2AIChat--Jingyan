@@ -21,20 +21,20 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
     })
     .join('');
 
-  // 检查是否包含sku_id格式的链接
-  const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)/g;
+  // 检查是否包含sku_id格式的链接，现在支持可选的价格参数
+  const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(\[([^\]]+)\])?/g;
   const matches = childrenString.match(skuLinkRegex);
-  
+
   if (matches && matches.length > 0) {
     // 解析每个匹配项
-    type SkuPart = { type: 'sku_card'; skuId: string; title: string };
+    type SkuPart = { type: 'sku_card'; skuId: string; title: string; customPrice?: string };
     type TextPart = { type: 'text'; content: string };
     type Part = SkuPart | TextPart;
     const parts: Part[] = [];
     let lastIndex = 0;
     let match;
-    
-    const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)/g;
+
+    const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(\[([^\]]+)\])?/g;
     while ((match = regex.exec(childrenString)) !== null) {
       // 添加匹配前的文本
       if (match.index > lastIndex) {
@@ -48,7 +48,8 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
       parts.push({
         type: 'sku_card',
         skuId: match[2],
-        title: match[1]
+        title: match[1],
+        customPrice: match[4] // 可选的价格参数 (match[3]是完整的[price], match[4]是price内容)
       });
       
       lastIndex = regex.lastIndex;
@@ -66,9 +67,9 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
       <div className="mb-2">
         {parts.map((part, index) => {
           if (part.type === 'sku_card') {
-            const productData = getProductMockData(part.skuId, part.title);
+            const productData = getProductMockData(part.skuId, part.title, part.customPrice);
             return (
-              <ProductCard 
+              <ProductCard
                 key={`sku-${part.skuId}-${index}`}
                 product={productData}
                 showDebugBounds={showDebugBounds}
@@ -427,23 +428,23 @@ export default function MobilePreviewHTML({
                               console.log('Paragraph children:', children);
                               console.log('Paragraph string:', childrenString);
                               
-                              // 检查是否包含sku_id格式的链接
-                              const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)/g;
-                              
+                              // 检查是否包含sku_id格式的链接，现在支持可选的价格参数
+                              const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(\[([^\]]+)\])?/g;
+
                               const matches = childrenString.match(skuLinkRegex);
-                              
+
                               if (matches && matches.length > 0) {
                                 console.log('Found SKU links in paragraph:', matches);
-                                
+
                                 // 解析每个匹配项
-                                type SkuPart = { type: 'sku_card'; skuId: string; title: string };
+                                type SkuPart = { type: 'sku_card'; skuId: string; title: string; customPrice?: string };
                                 type TextPart = { type: 'text'; content: string };
                                 type Part = SkuPart | TextPart;
                                 const parts: Part[] = [];
                                 let lastIndex = 0;
                                 let match;
-                                
-                                const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)/g;
+
+                                const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(\[([^\]]+)\])?/g;
                                 while ((match = regex.exec(childrenString)) !== null) {
                                   // 添加匹配前的文本
                                   if (match.index > lastIndex) {
@@ -457,7 +458,8 @@ export default function MobilePreviewHTML({
                                   parts.push({
                                     type: 'sku_card',
                                     skuId: match[2],
-                                    title: match[1]
+                                    title: match[1],
+                                    customPrice: match[4] // 可选的价格参数 (match[3]是完整的[price], match[4]是price内容)
                                   });
                                   
                                   lastIndex = regex.lastIndex;
@@ -475,9 +477,9 @@ export default function MobilePreviewHTML({
                                   <div className="mb-2">
                                     {parts.map((part, index) => {
                                       if (part.type === 'sku_card') {
-                                        const productData = getProductMockData(part.skuId, part.title);
+                                        const productData = getProductMockData(part.skuId, part.title, part.customPrice);
                                         return (
-                                          <ProductCard 
+                                          <ProductCard
                                             key={`sku-${part.skuId}-${index}`}
                                             product={productData}
                                             showDebugBounds={showDebugBounds}

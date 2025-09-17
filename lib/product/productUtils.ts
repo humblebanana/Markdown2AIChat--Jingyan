@@ -3,7 +3,7 @@ import { ProductInfo } from '@/types/product';
 /**
  * 根据SKU ID获取模拟商品数据
  */
-export function getProductMockData(skuId: string, productName?: string): ProductInfo {
+export function getProductMockData(skuId: string, productName?: string, customPrice?: string): ProductInfo {
   // 根据SKU ID生成模拟数据
   // 可以根据不同的SKU ID返回不同的模拟数据
   const mockData: Record<string, ProductInfo> = {
@@ -189,27 +189,37 @@ export function getProductMockData(skuId: string, productName?: string): Product
     }
   };
 
-  // 如果有预设数据，直接返回预设数据
+  // 获取基础产品数据
+  let productData: ProductInfo;
   if (mockData[skuId]) {
-    return { ...mockData[skuId] };
+    productData = { ...mockData[skuId] };
+  } else {
+    // 生成通用模拟数据
+    productData = {
+      skuId,
+      title: productName || `商品 SKU: ${skuId}`,
+      subtitle: '商品副标题',
+      price: 999,
+      priceUnit: '¥',
+      priceLabel: '到手价',
+      tags: ['推荐'],
+      aiComment: '评价总结',
+      productUrl: `https://item.jd.com/${skuId}.html`,
+      brandIconUrl: 'https://img20.360buyimg.com/img/jfs/t1/211566/18/49614/1016/674e83dfF67ae0edd/95c1cb915a0a1a3b.png',
+      reason: '700+人种草',
+      aiCommentText: '200+评价总结',
+      aiCommentCount: '200+评价总结'
+    };
   }
 
-  // 生成通用模拟数据，不再包含图片URL
-  return {
-    skuId,
-    title: productName || `商品 SKU: ${skuId}`,
-    subtitle: '商品副标题',
-    price: 999,
-    priceUnit: '¥',
-    priceLabel: '到手价',
-    tags: ['推荐'],
-    aiComment: '评价总结',
-    productUrl: `https://item.jd.com/${skuId}.html`,
-    brandIconUrl: 'https://img20.360buyimg.com/img/jfs/t1/211566/18/49614/1016/674e83dfF67ae0edd/95c1cb915a0a1a3b.png',
-    reason: '700+人种草',
-    aiCommentText: '200+评价总结',
-    aiCommentCount: '200+评价总结'
-  };
+  // 如果提供了自定义价格，解析并覆盖默认价格
+  if (customPrice) {
+    const parsedPrice = parseCustomPrice(customPrice);
+    productData.price = parsedPrice.value;
+    productData.priceUnit = parsedPrice.unit;
+  }
+
+  return productData;
 }
 
 /**
@@ -274,4 +284,76 @@ export function splitTextWithSkuCards(text: string): Array<{ type: 'text' | 'sku
   }
   
   return parts;
+}
+
+/**
+ * 价格解析结果接口
+ */
+export interface ParsedPrice {
+  value: number;
+  unit: string;
+  originalText: string;
+}
+
+/**
+ * 解析自定义价格参数
+ * 支持多种格式：¥299, $29.99, 299元, 15.8, etc.
+ */
+export function parseCustomPrice(priceText: string): ParsedPrice {
+  // 去除首尾空格
+  const cleanPrice = priceText.trim();
+
+  // 定义货币符号和单位的映射
+  const currencyMap: Record<string, string> = {
+    '¥': '¥',
+    '￥': '¥',
+    '$': '$',
+    '€': '€',
+    '£': '£',
+    '元': '¥',
+    'rmb': '¥',
+    'RMB': '¥'
+  };
+
+  // 正则表达式匹配各种价格格式
+  // 匹配: ¥299, $29.99, 299元, 15.8, etc.
+  const priceRegex = /^([¥￥$€£]?)\s*(\d+(?:\.\d{1,2})?)\s*(元|rmb|RMB)?$/i;
+  const match = cleanPrice.match(priceRegex);
+
+  if (match) {
+    const prefix = match[1] || ''; // 前缀符号
+    const value = parseFloat(match[2]); // 数值
+    const suffix = match[3] || ''; // 后缀单位
+
+    // 确定货币单位
+    let unit = '¥'; // 默认单位
+    if (prefix && currencyMap[prefix]) {
+      unit = currencyMap[prefix];
+    } else if (suffix && currencyMap[suffix.toLowerCase()]) {
+      unit = currencyMap[suffix.toLowerCase()];
+    }
+
+    return {
+      value,
+      unit,
+      originalText: cleanPrice
+    };
+  }
+
+  // 如果解析失败，尝试提取纯数字
+  const numberMatch = cleanPrice.match(/(\d+(?:\.\d{1,2})?)/);
+  if (numberMatch) {
+    return {
+      value: parseFloat(numberMatch[1]),
+      unit: '¥', // 默认单位
+      originalText: cleanPrice
+    };
+  }
+
+  // 完全解析失败，返回默认值
+  return {
+    value: 0,
+    unit: '¥',
+    originalText: cleanPrice
+  };
 }
