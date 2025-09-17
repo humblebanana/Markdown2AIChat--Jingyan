@@ -13,7 +13,7 @@ export interface CanvasTransform {
 
 export interface CanvasTransformHookReturn {
   transform: CanvasTransform;
-  canvasRef: React.RefObject<HTMLDivElement>;
+  canvasRef: React.RefObject<HTMLDivElement | null>;
   isDragging: boolean;
 
   // 缩放控制
@@ -148,7 +148,7 @@ export function useCanvasTransform(
     if (e.button !== 0 && e.button !== 1) return;
 
     // 检查是否按下空格键或者是中键
-    const isPanMode = e.button === 1 || e.getModifierState('Space') || e.shiftKey;
+    const isPanMode = e.button === 1 || e.shiftKey;
 
     if (!isPanMode && e.button !== 0) return;
 
