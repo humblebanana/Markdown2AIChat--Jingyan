@@ -24,9 +24,57 @@ export default function MarkdownInput({
         <label className="text-sm font-semibold text-gray-800">
           Markdown内容
         </label>
-        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-          支持标准语法
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+            支持标准语法
+          </span>
+          {/* 帮助：商品卡片格式说明 */}
+          <div className="relative group" aria-label="商品卡片格式帮助">
+            <div
+              className="w-5 h-5 rounded-full bg-gray-100 border border-gray-300 text-gray-600 flex items-center justify-center text-[12px] cursor-default select-none"
+              title="商品卡片渲染格式"
+            >
+              ?
+            </div>
+            {/* Tooltip */}
+            <div
+              className="absolute right-0 top-full mt-2 w-[520px] max-w-[92vw] hidden group-hover:block group-focus-within:block z-50"
+            >
+              <div className="rounded-md border border-gray-200 shadow-xl bg-white p-3 text-[12px] leading-5 text-gray-700 max-h-[70vh] overflow-auto break-words">
+                <div className="font-semibold text-gray-900 mb-1">商品卡片渲染格式</div>
+                <div className="space-y-1">
+                  <div>支持在 Markdown 中插入商品卡片：</div>
+                  <div className="space-y-1">
+                    <span className="text-gray-500">完整格式：</span>
+                    <div className="font-mono text-[11px] bg-gray-50 px-2 py-1 rounded break-all whitespace-pre-wrap">
+                      {`[sku_name](<sku_id>sku_id</sku_id>)[price][img_url]`}
+                    </div>
+                  </div>
+                  <div className="text-gray-600">说明：<span className="text-gray-500">price 和 img_url 可选</span></div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>
+                      仅 SKU：
+                      <div className="font-mono text-[11px] bg-gray-50 px-2 py-1 rounded break-all whitespace-pre-wrap inline-block mt-0.5">{`[标题](<sku_id>10147798291074</sku_id>)`}</div>
+                    </li>
+                    <li>
+                      带价格：
+                      <div className="font-mono text-[11px] bg-gray-50 px-2 py-1 rounded break-all whitespace-pre-wrap inline-block mt-0.5">{`[标题](<sku_id>10147798291074</sku_id>)[¥3999]`}</div>
+                    </li>
+                    <li>
+                      带价格和图片：
+                      <div className="font-mono text-[11px] bg-gray-50 px-2 py-1 rounded break-all whitespace-pre-wrap inline-block mt-0.5">
+                        {`[iPad Air 4](<sku_id>10147798291074</sku_id>)[3999][https://img13.360buyimg.com/n1/jfs/t1/100840/35/29773/163491/62949eeeE449ab513/2cf9c84c0ce30292.jpg]`}
+                      </div>
+                    </li>
+                  </ul>
+                  <div className="text-gray-500 mt-1">
+                    价格示例：{`¥299 / 299元 / $29.99`}; 未提供图片时会自动使用稳定随机图。
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <textarea
         value={value}

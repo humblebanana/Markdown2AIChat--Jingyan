@@ -571,7 +571,7 @@ export default function Home() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900">
-            Markdown 转 AI Chat 界面预览
+            京言  Markdown 转 AI 聊天界面预览
             </h1>
             <p className="text-sm text-gray-600 mt-1">
             一键将 Markdown 渲染为高保真移动端AI Chatbot聊天页面，所见即所得、可直接导出
