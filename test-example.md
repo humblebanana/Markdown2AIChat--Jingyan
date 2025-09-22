@@ -29,3 +29,8 @@
 [测试产品3](<sku_id>123458</sku_id>)[$29.99]
 [测试产品4](<sku_id>123459</sku_id>)[15.5]
 [测试产品5](<sku_id>123460</sku_id>)[RMB 199]
+
+## 带图片URL的产品卡片
+
+[iPad Air 4](<sku_id>10147798291074</sku_id>)[3999][https://img13.360buyimg.com/n1/jfs/t1/100840/35/29773/163491/62949eeeE449ab513/2cf9c84c0ce30292.jpg]
+[电子产品示例](<sku_id>10088430135684</sku_id>)[¥2658][https://img14.360buyimg.com/n1/s720x720_jfs/t1/286218/12/13489/38063/689db708F4d5e3a21/5d9724f97ddeee5a.png]

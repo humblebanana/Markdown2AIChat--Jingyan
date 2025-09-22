@@ -6,7 +6,9 @@ import remarkGfm from 'remark-gfm';
 import MobileInputBar from './MobileInputBar';
 import ProductCard from '@/components/product/ProductCard';
 import { getProductMockData } from '@/lib/product/productUtils';
+import { getRandomProductImage } from '@/lib/product/productImages';
 import { useCanvasTransform } from '@/hooks/use-canvas-transform';
+import { getProxiedImageUrl } from '@/lib/image/proxy';
 
 // 通用SKU检测和渲染函数
 const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false): React.ReactNode => {
@@ -21,20 +23,20 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
     })
     .join('');
 
-  // 检查是否包含sku_id格式的链接，现在支持可选的价格参数
-  const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(\[([^\]]+)\])?/g;
+  // 检查是否包含sku_id格式的链接，支持可选的价格与图片URL参数：[title](<sku_id>xxx</sku_id>)[price][img_url]
+  const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(?:\[([^\]]+)\])?(?:\[(https?:\/\/[^\]]+)\])?/g;
   const matches = childrenString.match(skuLinkRegex);
 
   if (matches && matches.length > 0) {
     // 解析每个匹配项
-    type SkuPart = { type: 'sku_card'; skuId: string; title: string; customPrice?: string };
+    type SkuPart = { type: 'sku_card'; skuId: string; title: string; customPrice?: string; imageUrl?: string };
     type TextPart = { type: 'text'; content: string };
     type Part = SkuPart | TextPart;
     const parts: Part[] = [];
     let lastIndex = 0;
     let match;
 
-    const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(\[([^\]]+)\])?/g;
+    const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(?:\[([^\]]+)\])?(?:\[(https?:\/\/[^\]]+)\])?/g;
     while ((match = regex.exec(childrenString)) !== null) {
       // 添加匹配前的文本
       if (match.index > lastIndex) {
@@ -49,7 +51,8 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
         type: 'sku_card',
         skuId: match[2],
         title: match[1],
-        customPrice: match[4] // 可选的价格参数 (match[3]是完整的[price], match[4]是price内容)
+        customPrice: match[3], // 可选价格
+        imageUrl: match[4] // 可选图片URL
       });
       
       lastIndex = regex.lastIndex;
@@ -68,10 +71,14 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
         {parts.map((part, index) => {
           if (part.type === 'sku_card') {
             const productData = getProductMockData(part.skuId, part.title, part.customPrice);
+            const productDataWithImg = {
+              ...productData,
+              imageUrl: part.imageUrl || getRandomProductImage(part.skuId)
+            };
             return (
               <ProductCard
                 key={`sku-${part.skuId}-${index}`}
-                product={productData}
+                product={productDataWithImg}
                 showDebugBounds={showDebugBounds}
               />
             );
@@ -129,6 +136,7 @@ export default function MobilePreviewHTML({
   // 在画布模式下，实际的显示模式由canvasViewMode决定
   const effectiveViewMode = isCanvasMode ? canvasViewMode : previewMode;
   const isEffectiveSingle = effectiveViewMode === 'single';
+  const topNavIconSrc = getProxiedImageUrl('https://img13.360buyimg.com/imagetools/jfs/t1/330920/24/6011/8950/68b180ebFa0b81de2/2ae3e75b7cc7245b.png');
 
   // 画布变换Hook
   const canvasTransform = useCanvasTransform(
@@ -313,11 +321,7 @@ export default function MobilePreviewHTML({
       <div className="bg-white px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <img 
-              src="https://img13.360buyimg.com/imagetools/jfs/t1/330920/24/6011/8950/68b180ebFa0b81de2/2ae3e75b7cc7245b.png"
-              alt="" 
-              className="w-6 h-6 mr-2"
-            />
+            <img src={topNavIconSrc || undefined} alt="" className="w-6 h-6 mr-2" />
             <div className="text-sm font-medium text-gray-900">有问题，找京言</div>
           </div>
           <div className="close-nav-icon touch">
@@ -428,8 +432,8 @@ export default function MobilePreviewHTML({
                               console.log('Paragraph children:', children);
                               console.log('Paragraph string:', childrenString);
                               
-                              // 检查是否包含sku_id格式的链接，现在支持可选的价格参数
-                              const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(\[([^\]]+)\])?/g;
+                              // 检查是否包含sku_id格式的链接，支持可选的价格与图片URL参数：[title](<sku_id>xxx</sku_id>)[price][img_url]
+                              const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(?:\[([^\]]+)\])?(?:\[(https?:\/\/[^\]]+)\])?/g;
 
                               const matches = childrenString.match(skuLinkRegex);
 
@@ -437,14 +441,14 @@ export default function MobilePreviewHTML({
                                 console.log('Found SKU links in paragraph:', matches);
 
                                 // 解析每个匹配项
-                                type SkuPart = { type: 'sku_card'; skuId: string; title: string; customPrice?: string };
+                                type SkuPart = { type: 'sku_card'; skuId: string; title: string; customPrice?: string; imageUrl?: string };
                                 type TextPart = { type: 'text'; content: string };
                                 type Part = SkuPart | TextPart;
                                 const parts: Part[] = [];
                                 let lastIndex = 0;
                                 let match;
 
-                                const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(\[([^\]]+)\])?/g;
+                                const regex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(?:\[([^\]]+)\])?(?:\[(https?:\/\/[^\]]+)\])?/g;
                                 while ((match = regex.exec(childrenString)) !== null) {
                                   // 添加匹配前的文本
                                   if (match.index > lastIndex) {
@@ -459,7 +463,8 @@ export default function MobilePreviewHTML({
                                     type: 'sku_card',
                                     skuId: match[2],
                                     title: match[1],
-                                    customPrice: match[4] // 可选的价格参数 (match[3]是完整的[price], match[4]是price内容)
+                                    customPrice: match[3], // 价格（可选）
+                                    imageUrl: match[4] // 图片URL（可选）
                                   });
                                   
                                   lastIndex = regex.lastIndex;
@@ -478,10 +483,14 @@ export default function MobilePreviewHTML({
                                     {parts.map((part, index) => {
                                       if (part.type === 'sku_card') {
                                         const productData = getProductMockData(part.skuId, part.title, part.customPrice);
+                                        const productDataWithImg = {
+                                          ...productData,
+                                          imageUrl: part.imageUrl || getRandomProductImage(part.skuId)
+                                        };
                                         return (
                                           <ProductCard
                                             key={`sku-${part.skuId}-${index}`}
-                                            product={productData}
+                                            product={productDataWithImg}
                                             showDebugBounds={showDebugBounds}
                                           />
                                         );

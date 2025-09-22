@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProductCardProps } from '@/types/product';
+import { getProxiedImageUrl } from '@/lib/image/proxy';
 import Shimmer from '@/components/ui/Shimmer';
 
 /**
@@ -7,6 +8,8 @@ import Shimmer from '@/components/ui/Shimmer';
  * 完全基于线上HTML结构设计，1:1还原移动端展示效果
  */
 export default function ProductCard({ product, showDebugBounds = false }: ProductCardProps) {
+  const [imgLoaded, setImgLoaded] = React.useState(false);
+  const [imgError, setImgError] = React.useState(false);
   // AI评价箭头图标（base64）
   const arrowIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABsAAAAcBAMAAABi/9neAAAAFVBMVEUAAAD/SH//SID/SID/SoD/UID/SH8V4fo1AAAABnRSTlMA3yBAMBB3WutwAAAAM0lEQVQY02OgFDAroHDZhFC5iSjSjGko0kxiqNKKNJNGcBGKqS+J8CDC+3gChyWAuCAGAEYUCwam/KUHAAAAAElFTkSuQmCC";
 
@@ -23,12 +26,28 @@ export default function ProductCard({ product, showDebugBounds = false }: Produc
                     {/* 商品图片区域 */}
                     <div className="main-img-view">
                       <div className="sku-img-c">
-                        <Shimmer
-                          width="100%"
-                          height="100%"
-                          borderRadius="6px"
-                          className="sku-img sku-img-new"
-                        />
+                        {/* 骨架屏占位 */}
+                        {!imgLoaded && (
+                          <Shimmer
+                            width="100%"
+                            height="100%"
+                            borderRadius="6px"
+                            className="sku-img sku-img-new"
+                          />
+                        )}
+                        {/* 实际商品图 */}
+                        {product.imageUrl && !imgError && (
+                          <img
+                            className="sku-img sku-img-new"
+                            src={getProxiedImageUrl(product.imageUrl)}
+                            alt={product.title}
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                            crossOrigin="anonymous"
+                            referrerPolicy="no-referrer"
+                            onLoad={() => setImgLoaded(true)}
+                            onError={() => setImgError(true)}
+                          />
+                        )}
                         <div className="sku-img-mask"></div>
                       </div>
                     </div>
@@ -44,9 +63,11 @@ export default function ProductCard({ product, showDebugBounds = false }: Produc
                               <div className="tags_element_container">
                                 <img
                                   className="icon_tag"
-                                  src={product.brandIconUrl}
+                                  src={getProxiedImageUrl(product.brandIconUrl)}
                                   alt=""
                                   style={{ visibility: 'visible' }}
+                                  crossOrigin="anonymous"
+                                  referrerPolicy="no-referrer"
                                 />
                               </div>
                             </div>

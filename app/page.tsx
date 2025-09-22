@@ -182,36 +182,92 @@ export default function Home() {
 
         // 使用克隆元素进行截图
         screenshotTarget = clonedFrame;
+      } else {
+        // 非画布模式也使用克隆，避免对真实DOM造成视觉干扰
+        console.log('🎨 [截图] 非画布模式：创建临时截图容器...');
+        tempContainer = document.createElement('div');
+        tempContainer.style.position = 'fixed';
+        tempContainer.style.top = '-10000px';
+        tempContainer.style.left = '-10000px';
+        tempContainer.style.pointerEvents = 'none';
+        tempContainer.style.zIndex = '-9999';
+
+        const clonedFrame = mobileFrame.cloneNode(true) as HTMLElement;
+        clonedFrame.style.transform = 'none';
+        clonedFrame.style.position = 'static';
+        clonedFrame.style.top = 'auto';
+        clonedFrame.style.left = 'auto';
+        clonedFrame.style.marginTop = '0';
+        clonedFrame.style.marginLeft = '0';
+        clonedFrame.style.visibility = 'visible';
+
+        tempContainer.appendChild(clonedFrame);
+        document.body.appendChild(tempContainer);
+        screenshotTarget = clonedFrame;
       }
 
       // 定位可滚动容器与其内容（使用截图目标）
       const scroller = screenshotTarget.querySelector('[data-role="mobile-scrollview"]') as HTMLElement | null;
       const scrollContent = scroller?.querySelector('[data-role="mobile-scrollcontent"]') as HTMLElement | null;
 
+      // 等待图片资源加载完成，避免截图时外链图片未就绪
+      const waitForImages = async (root: HTMLElement, timeoutMs = 4000) => {
+        const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
+        const pending = imgs.filter(img => !img.complete || img.naturalWidth === 0);
+        if (pending.length === 0) return;
+        await Promise.race([
+          Promise.all(
+            pending.map(
+              img => new Promise<void>(resolve => {
+                const done = () => resolve();
+                img.addEventListener('load', done, { once: true });
+                img.addEventListener('error', done, { once: true });
+              })
+            )
+          ),
+          new Promise<void>(resolve => setTimeout(resolve, timeoutMs))
+        ]);
+      };
+      await waitForImages(screenshotTarget);
+
+      // 将代理图片预内联为 dataURL，减少导出时并发抓取与跨域波动
+      const preInlineImages = async (root: HTMLElement, timeoutMs = 6000) => {
+        const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
+        const rootOrigin = window.location.origin;
+        const isProxyUrl = (u: string) => u.startsWith(rootOrigin + '/api/image-proxy') || u.startsWith('/api/image-proxy');
+        const toDataURL = async (url: string) => {
+          const resp = await fetch(url, { cache: 'force-cache' });
+          const blob = await resp.blob();
+          return await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        };
+        const targets = imgs.filter(img => isProxyUrl(img.src));
+        await Promise.race([
+          Promise.all(targets.map(async img => {
+            try {
+              const dataUrl = await toDataURL(img.src);
+              img.setAttribute('src', dataUrl);
+              img.removeAttribute('crossorigin');
+              img.removeAttribute('referrerpolicy');
+            } catch (e) {
+              // ignore single image failure
+            }
+          })),
+          new Promise<void>(resolve => setTimeout(resolve, timeoutMs))
+        ]);
+      };
+      await preInlineImages(screenshotTarget);
+
       if (isSingle && scroller && scrollContent) {
-        // 在截图前，将滚动偏移“转化”为内容的负向位移
-        // 这样克隆DOM时即便滚动位置不被保留，视觉上仍可获得当前视口内容
-        scrollAdjust.applied = true;
-        scrollAdjust.originalOverflow = scroller.style.overflow;
-        scrollAdjust.originalTransform = scrollContent.style.transform;
-        scrollAdjust.originalScrollTop = scroller.scrollTop;
-
-        // 隐藏以避免用户看到瞬时跳动（仅当不是画布模式时）
-        let originalVisibilityLocal = '';
-        if (!isCanvasMode) {
-          originalVisibilityLocal = mobileFrame.style.visibility;
-          mobileFrame.style.visibility = 'hidden';
-        }
-
+        // 在克隆节点上，将原始滚动位置转化为负向位移，复现当前视口
+        const originalScroller = mobileFrame.querySelector('[data-role="mobile-scrollview"]') as HTMLElement | null;
+        const originalScrollTop = originalScroller?.scrollTop || 0;
         scroller.style.overflow = 'hidden';
-        scroller.scrollTop = 0; // 避免库重置滚动产生影响
-        scrollContent.style.transform = `translateY(-${scrollAdjust.originalScrollTop}px)`;
-
-        // 强制重绘并恢复可视（仅当不是画布模式时）
-        if (!isCanvasMode) {
-          mobileFrame.offsetHeight;
-          mobileFrame.style.visibility = originalVisibilityLocal;
-        }
+        scroller.scrollTop = 0;
+        scrollContent.style.transform = `translateY(-${originalScrollTop}px)`;
       }
 
       // 📸 临时添加截图优化样式
@@ -244,7 +300,7 @@ export default function Home() {
 
       // 等待内容完全渲染
       console.log('⏳ [截图] 等待内容渲染完成...');
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // 生成文件名
       const timestamp = new Date().toISOString()
@@ -275,13 +331,13 @@ export default function Home() {
             if (node.nodeType === Node.ELEMENT_NODE) {
               const element = node as HTMLElement;
               const style = window.getComputedStyle(element);
-
-              // 跳过绝对定位的滚动条或浮层元素
-              if (style.position === 'absolute' && element.tagName !== 'DIV') return false;
+              // 仅跳过明显的滚动条/遮罩/动画光标等，不要过滤普通图片
               // 跳过可能的滚动条元素
               if (element.className.includes('scrollbar')) return false;
               // 跳过可能的overlay元素
               if (element.className.includes('overlay')) return false;
+              // 可通过 data-omit-screenshot 自定义忽略
+              if (element.getAttribute('data-omit-screenshot') === 'true') return false;
             }
             return true;
           },
