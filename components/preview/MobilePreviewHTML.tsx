@@ -67,7 +67,7 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
     }
     
     return (
-      <div className="mb-2">
+      <>
         {parts.map((part, index) => {
           if (part.type === 'sku_card') {
             const productData = getProductMockData(part.skuId, part.title, part.customPrice);
@@ -76,11 +76,12 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
               imageUrl: part.imageUrl || getRandomProductImage(part.skuId)
             };
             return (
-              <ProductCard
-                key={`sku-${part.skuId}-${index}`}
-                product={productDataWithImg}
-                showDebugBounds={showDebugBounds}
-              />
+              <div key={`sku-${part.skuId}-${index}`} className="my-2">
+                <ProductCard
+                  product={productDataWithImg}
+                  showDebugBounds={showDebugBounds}
+                />
+              </div>
             );
           } else {
             return part.content.trim() ? (
@@ -90,7 +91,7 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
             ) : null;
           }
         })}
-      </div>
+      </>
     );
   }
   
@@ -479,7 +480,7 @@ export default function MobilePreviewHTML({
                                 }
                                 
                                 return (
-                                  <div className="mb-2">
+                                  <>
                                     {parts.map((part, index) => {
                                       if (part.type === 'sku_card') {
                                         const productData = getProductMockData(part.skuId, part.title, part.customPrice);
@@ -488,11 +489,12 @@ export default function MobilePreviewHTML({
                                           imageUrl: part.imageUrl || getRandomProductImage(part.skuId)
                                         };
                                         return (
-                                          <ProductCard
-                                            key={`sku-${part.skuId}-${index}`}
-                                            product={productDataWithImg}
-                                            showDebugBounds={showDebugBounds}
-                                          />
+                                          <div key={`sku-${part.skuId}-${index}`} className="my-2">
+                                            <ProductCard
+                                              product={productDataWithImg}
+                                              showDebugBounds={showDebugBounds}
+                                            />
+                                          </div>
                                         );
                                       } else {
                                         return part.content.trim() ? (
@@ -502,17 +504,25 @@ export default function MobilePreviewHTML({
                                         ) : null;
                                       }
                                     })}
-                                  </div>
+                                  </>
                                 );
                               }
                               
                               // 普通段落正常处理
                               return <p className="text-sm text-gray-700 leading-relaxed mb-2">{children}</p>;
                             },
-                            ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 mb-3">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 mb-3">{children}</ol>,
+                            ul: ({ children }) => (
+                              <ul className="mb-2" style={{ listStyleType: 'disc', listStylePosition: 'outside', margin: 0, padding: 0, paddingLeft: '20px' }}>
+                                {children}
+                              </ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="mb-2" style={{ listStyleType: 'decimal', listStylePosition: 'outside', margin: 0, padding: 0, paddingLeft: '20px' }}>
+                                {children}
+                              </ol>
+                            ),
                             li: ({ children }) => (
-                              <li className="text-sm text-gray-700">
+                              <li className="text-sm text-gray-700 leading-relaxed" style={{ display: 'list-item', marginBottom: 0, paddingBottom: 0, paddingLeft: '4px' }}>
                                 {renderWithSkuCards(children, showDebugBounds)}
                               </li>
                             ),

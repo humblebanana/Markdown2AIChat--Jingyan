@@ -116,6 +116,13 @@ function QuickTests({
       source: '/test-simple.md',
     },
     {
+      id: 'ordered-list',
+      title: '有序列表测试',
+      subtitle: '测试有序列表 1. 2. 3. 渲染',
+      type: 'remote',
+      source: '/test-ordered-list.md',
+    },
+    {
       id: 'ipad',
       title: '数字绘画二手 iPad 推荐',
       subtitle: '长文结构 + 列表/图片占位',

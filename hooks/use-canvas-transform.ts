@@ -245,8 +245,15 @@ export function useCanvasTransform(
   // 键盘快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 禁用空格键的默认滚动行为
-      if (e.code === 'Space' && !e.repeat) {
+      // 检查焦点是否在可编辑元素上（输入框、文本域等）
+      const target = e.target as HTMLElement;
+      const isEditableElement =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      // 只在画布模式且焦点不在可编辑元素上时，才禁用空格键的默认滚动行为
+      if (e.code === 'Space' && !e.repeat && !isEditableElement && isCanvasMode) {
         e.preventDefault();
         if (canvasRef.current) {
           canvasRef.current.style.cursor = 'grab';
@@ -268,7 +275,8 @@ export function useCanvasTransform(
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
+      // 只在画布模式下处理空格键释放
+      if (e.code === 'Space' && isCanvasMode) {
         if (canvasRef.current) {
           canvasRef.current.style.cursor = '';
         }
@@ -282,7 +290,7 @@ export function useCanvasTransform(
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [resetView, zoomIn, zoomOut]);
+  }, [resetView, zoomIn, zoomOut, isCanvasMode]);
 
   // 直接设置变换状态
   const updateTransform = useCallback((newTransform: CanvasTransform) => {
