@@ -12,20 +12,24 @@ interface InputPanelProps {
   isProcessing?: boolean;
   showSidebar?: boolean;
   onToggleSidebar?: () => void;
+  productImageMode?: 'mock' | 'shimmer';
+  onProductImageModeChange?: (mode: 'mock' | 'shimmer') => void;
 }
 
 /**
  * 输入面板容器 - 包含查询输入和Markdown输入
  * 对应原型图左侧的双输入面板布局
  */
-export default function InputPanel({ 
-  queryValue, 
-  markdownValue, 
-  onQueryChange, 
-  onMarkdownChange, 
+export default function InputPanel({
+  queryValue,
+  markdownValue,
+  onQueryChange,
+  onMarkdownChange,
   isProcessing = false,
   showSidebar = true,
-  onToggleSidebar
+  onToggleSidebar,
+  productImageMode = 'mock',
+  onProductImageModeChange
 }: InputPanelProps) {
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   return (
@@ -65,6 +69,41 @@ export default function InputPanel({
             onQueryChange(payload.title);
           }}
         />
+
+        {/* 商品卡片图片显示模式切换 */}
+        {onProductImageModeChange && (
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-gray-800">商品卡片图片模式</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onProductImageModeChange('mock')}
+                className={`px-3 py-2 text-[13px] rounded-md border transition-colors duration-150 ${
+                  productImageMode === 'mock'
+                    ? 'border-gray-300 bg-gray-50 text-gray-900'
+                    : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex flex-col items-start gap-1">
+                  <span className="font-medium">模拟图片</span>
+                  <span className="text-[11px] text-gray-500">显示随机商品图</span>
+                </div>
+              </button>
+              <button
+                onClick={() => onProductImageModeChange('shimmer')}
+                className={`px-3 py-2 text-[13px] rounded-md border transition-colors duration-150 ${
+                  productImageMode === 'shimmer'
+                    ? 'border-gray-300 bg-gray-50 text-gray-900'
+                    : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex flex-col items-start gap-1">
+                  <span className="font-medium">Shimmer特效</span>
+                  <span className="text-[11px] text-gray-500">全部显示加载动画</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Markdown输入 */}
         <MarkdownInput
@@ -116,13 +155,6 @@ function QuickTests({
       source: '/test-simple.md',
     },
     {
-      id: 'ordered-list',
-      title: '有序列表测试',
-      subtitle: '测试有序列表 1. 2. 3. 渲染',
-      type: 'remote',
-      source: '/test-ordered-list.md',
-    },
-    {
       id: 'ipad',
       title: '数字绘画二手 iPad 推荐',
       subtitle: '长文结构 + 列表/图片占位',
@@ -131,109 +163,73 @@ function QuickTests({
     },
     {
       id: 'pants',
-      title: '15-20 度轻薄冲锋裤推荐',
-      subtitle: '两款对比 + 评分表格',
+      title: '笔记本电脑推荐',
+      subtitle: '多场景笔记本推荐 + 商品卡片',
       type: 'inline',
-      content: `# 15-20度轻薄冲锋裤推荐
+      content: `根据您的需求，我为您精选了几款不同定位的笔记本电脑，您可以根据主要用途来选择：
 
-这个温度区间确实是选择冲锋裤的"甜蜜点"，既需要一定的防护，又不能太厚重闷热。我专门研究了轻薄透气型冲锋裤的特点，为你找到了两款非常适合的选择，覆盖不同预算需求：
+## 轻薄办公本（适合日常办公、学习）
 
-## 🏆 性价比之选：凯乐石软壳冲锋裤
+联想异能者P15H：15.6英寸大屏，16G+512G配置，仅1.7kg重，接口齐全，适合基础办公学习
 
-[凯乐石软壳冲锋裤](<sku_id>10179034851442</sku_id>) **157元**
+[product:1]
 
-**核心优势：**
-- **轻薄透气**：涤纶+腈纶混纺面料，配合Omni-Tech技术，防水防风的同时透气性出色
-- **舒适版型**：用户反馈"面料很舒服，版型也很正，穿着显瘦"
-- **速干性能**：有用户评价"速干性能很出色，雨天出行完全无压力"
-- **性价比突出**：157元的价格在同类产品中极具竞争力
+惠普锐15：AMD锐龙处理器，16G+512G，国家补贴后仅2999元，性价比极高
 
-**适合人群**：注重性价比，偶尔户外活动或日常通勤使用的用户
+[product:5]
 
----
+## 高性能全能本（适合设计、剪辑等专业需求）
 
-## 🎯 专业高端选择：始祖鸟BETA系列
+联想小新16高配版：13代i5处理器，24G大内存+512G，16:10黄金比例屏幕
 
-[始祖鸟BETA冲锋裤](<sku_id>10163790870156</sku_id>) **3000元**
+[product:6]
 
-**核心优势：**
-- **顶级面料**：Gore-Tex技术 + 锦纶面料，轻量化硬壳的标杆产品
-- **专业防护**：全天候防水防风性能，户外恶劣环境下表现出色  
-- **品牌保障**：始祖鸟的品质标准和工艺细节，用户评价"大品牌，质量太好了"
-- **轻薄耐用**：专为追求极致性能的户外爱好者设计
+## 游戏本（适合大型游戏、3D渲染）
 
-**适合人群**：经常户外活动，对装备品质有高要求的专业用户
+拯救者Y7000P：i7处理器+RTX4060显卡，165Hz高刷屏，专业电竞配置
 
----
+[product:2]
 
-## 📊 快速对比
+拯救者Y9000P：i7-14650H+RTX5060，180Hz高刷屏，专业级性能
 
-| 特点 | 凯乐石软壳 | 始祖鸟BETA |
-|------|------------|------------|
-| **价格** | 157元 | 3000元 |
-| **面料技术** | Omni-Tech | Gore-Tex |
-| **使用场景** | 日常/轻度户外 | 专业户外 |
-| **性价比** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| **专业性** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+[product:4]
 
-## 💡 选购建议
-
-对于15-20度的气温，这两款都能满足直接穿着的需求。**如果你是户外新手或预算有限**，凯乐石的性价比非常突出；**如果你经常进行户外活动且追求顶级品质**，始祖鸟的投资绝对值得。
-
-记得选择时要考虑腰围尺码，冲锋裤通常建议选稍微宽松一点的版型，方便活动。你比较倾向于哪个价位区间呢？我可以进一步为你分析具体的尺码选择。`,
+您对笔记本电脑的主要用途是什么？<ClickText>日常办公</ClickText>，<ClickText>游戏娱乐</ClickText>，<ClickText>设计创作</ClickText>，<ClickText>学习上网</ClickText>，<ClickText>商务出差</ClickText>`,
     },
     {
       id: 'laptop',
       title: '高性能笔记本推荐',
       subtitle: '三机型对比 + 表格',
       type: 'inline',
-      content: `# 帮你找到了几款适合的高性能笔记本 💻
+      content: `根据您的需求，我为您精选了几款不同定位的笔记本电脑，您可以根据主要用途来选择：
 
-根据你的需求，我深入研究了即梦AI和问道5开的配置要求，发现即梦AI对内存和显卡要求较高（推荐32GB内存+4GB显存），问道5开则需要稳定的多核处理器。综合你的预算和使用场景，为你筛选出3款性价比很高的选择：
+## 轻薄办公本（适合日常办公、学习）
 
-## 🏆 强烈推荐：[拯救者Y7000P](<sku_id>10168157834529</sku_id>)
-**价格：3278元（在预算内）**
+联想异能者P15H：15.6英寸大屏，16G+512G配置，仅1.7kg重，接口齐全，适合基础办公学习
 
-这款是我找到的最符合你需求的选择：
-- **超强配置**：64GB内存（比你要求的32GB还多一倍）+ i7-14650HX 14代酷睿 + RTX4060独显
-- **剪辑友好**：2560*1600高分辨率 + 165Hz刷新率 + 100% sRGB色域，视频剪辑显示效果很棒
-- **散热出色**：用户反馈"散热性很好，玩游戏一点不卡"，长时间运行AI软件和游戏多开都很稳定
-- **性价比超高**：99%好评率，3278元的价格配这个配置真的很划算
+[product:1]
 
-## 💼 品牌保障：[戴尔游匣G15](<sku_id>10142609044015</sku_id>)
-**价格：4799元（超预算799元）**
+惠普锐15：AMD锐龙处理器，16G+512G，国家补贴后仅2999元，性价比极高
 
-如果你更看重品牌可靠性：
-- **精准匹配**：32GB内存+1TB固态硬盘，完全按你的要求配置
-- **稳定表现**：RTX4060独显+13代酷睿i7，用户反馈"运行流畅"被提及25次
-- **品牌溢价**：戴尔在专业应用领域经验丰富，售后服务也更完善
+[product:5]
 
-## 🎯 专业稳定：[戴尔Pro15](<sku_id>10142991499863</sku_id>)
-**价格：4099元（仅超预算99元）**
+## 高性能全能本（适合设计、剪辑等专业需求）
 
-工作站定位，适合长时间专业工作：
-- **护眼设计**：莱茵护眼认证屏幕，长时间剪辑不累眼
-- **专业优化**：用户评价在CAD、PS等专业软件运行流畅
-- **人性化功能**：人脸解锁+指纹解锁+背光键盘，使用体验很贴心
+联想小新16高配版：13代i5处理器，24G大内存+512G，16:10黄金比例屏幕
 
-## 📋 配置对比表
+[product:6]
 
-| 型号 | 价格 | 内存 | 显卡 | 处理器 | 特色优势 |
-|------|------|------|------|--------|----------|
-| 拯救者Y7000P | 3278元 | 64GB | RTX4060 | i7-14650HX | 性价比王者，超强散热 |
-| 戴尔游匣G15 | 4799元 | 32GB | RTX4060 | 13代i7 | 品牌可靠，配置精准 |
-| 戴尔Pro15 | 4099元 | 32GB | 独显4GB | i7-10850H | 工作站级稳定性 |
+## 游戏本（适合大型游戏、3D渲染）
 
-## 💡 我的建议
+拯救者Y7000P：i7处理器+RTX4060显卡，165Hz高刷屏，专业电竞配置
 
-**首推拯救者Y7000P**，原因是：
-1. **预算友好**：完全在4000元预算内
-2. **配置超预期**：64GB内存让你跑即梦AI和问道5开完全无压力
-3. **长期使用**：优秀散热保证长时间高负载稳定运行
+[product:2]
 
-关于**分期付款**，这3款在京东都支持白条分期，你可以根据自己情况选择期数。
+拯救者Y9000P：i7-14650H+RTX5060，180Hz高刷屏，专业级性能
 
-还有什么想了解的配置细节或使用场景吗？比如具体想了解哪款的散热表现或者屏幕效果？`,
+[product:4]
+
+您对笔记本电脑的主要用途是什么？<ClickText>日常办公</ClickText>，<ClickText>游戏娱乐</ClickText>，<ClickText>设计创作</ClickText>，<ClickText>学习上网</ClickText>，<ClickText>商务出差</ClickText>`,
     },
   ];
 
@@ -263,7 +259,10 @@ function QuickTests({
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-gray-800">快速测试</span>
         <button
-          onClick={() => onApply({ title: '空白文档', content: '' })}
+          onClick={() => {
+            onSelect('');
+            onApply({ title: '空白文档', content: '' });
+          }}
           className="text-xs text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100 transition"
           title="清空输入"
         >

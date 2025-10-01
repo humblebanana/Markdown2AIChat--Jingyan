@@ -10,8 +10,141 @@ import { getRandomProductImage } from '@/lib/product/productImages';
 import { useCanvasTransform } from '@/hooks/use-canvas-transform';
 import { getProxiedImageUrl } from '@/lib/image/proxy';
 
+/**
+ * 预处理Markdown内容：处理特殊标记
+ * 1. [product:id] → 商品卡片占位符
+ * 2. <ClickText>文本</ClickText> → 下划线文本
+ *
+ * 注意：使用 ⟪⟫ 作为分隔符，避免被Markdown解析器处理（__ 会被当作斜体）
+ */
+function preprocessMarkdown(markdown: string): string {
+  let processed = markdown;
+
+  // 处理 [product:id] 格式 - 使用特殊的Unicode字符作为分隔符
+  // 自动在商品卡片前后添加空行，使其独立成段
+  processed = processed.replace(/\[product:(\d+)\]/g, (match, id) => {
+    return `\n\n⟪PRODUCT_CARD_${id}⟫\n\n`;
+  });
+
+  // 处理 <ClickText>文本</ClickText> 格式
+  processed = processed.replace(/<ClickText>(.*?)<\/ClickText>/g, (match, text) => {
+    return `⟪CLICK_TEXT_START⟫${text}⟪CLICK_TEXT_END⟫`;
+  });
+
+  return processed;
+}
+
+/**
+ * 渲染处理后的文本节点：还原特殊标记为实际组件
+ */
+function renderProcessedText(text: string, showDebugBounds = false, productImageMode: 'mock' | 'shimmer' = 'mock'): React.ReactNode {
+  // 检测是否包含特殊标记（使用新的分隔符）
+  const hasProductCard = text.includes('⟪PRODUCT_CARD_');
+  const hasClickText = text.includes('⟪CLICK_TEXT_');
+
+  if (!hasProductCard && !hasClickText) {
+    return text;
+  }
+
+  // 分割文本，提取所有标记
+  const parts: Array<{ type: 'text' | 'product' | 'clicktext'; content: string }> = [];
+  let lastIndex = 0;
+
+  // 合并正则：匹配商品卡片和下划线文本
+  const regex = /⟪PRODUCT_CARD_(\d+)⟫|⟪CLICK_TEXT_START⟫(.*?)⟪CLICK_TEXT_END⟫/g;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    // 添加匹配前的文本
+    if (match.index > lastIndex) {
+      parts.push({
+        type: 'text',
+        content: text.slice(lastIndex, match.index)
+      });
+    }
+
+    // 判断匹配类型
+    if (match[0].startsWith('⟪PRODUCT_CARD_')) {
+      parts.push({
+        type: 'product',
+        content: match[1] // 商品ID
+      });
+    } else if (match[0].startsWith('⟪CLICK_TEXT_START⟫')) {
+      parts.push({
+        type: 'clicktext',
+        content: match[2] // 文本内容
+      });
+    }
+
+    lastIndex = regex.lastIndex;
+  }
+
+  // 添加剩余文本
+  if (lastIndex < text.length) {
+    parts.push({
+      type: 'text',
+      content: text.slice(lastIndex)
+    });
+  }
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (part.type === 'product') {
+          // 渲染商品卡片
+          const productData = getProductMockData(part.content, `商品 ${part.content}`);
+          // 根据 productImageMode 决定是否传递图片 URL
+          const productDataWithImg = {
+            ...productData,
+            // shimmer 模式下传递空字符串，让组件只显示 shimmer 特效
+            imageUrl: productImageMode === 'shimmer' ? '' : getRandomProductImage(part.content)
+          };
+          return (
+            <div key={`product-${part.content}-${index}`} className="my-2">
+              <ProductCard
+                product={productDataWithImg}
+                showDebugBounds={showDebugBounds}
+              />
+            </div>
+          );
+        } else if (part.type === 'clicktext') {
+          // 渲染下划线文本
+          return (
+            <span
+              key={`clicktext-${index}`}
+              className="underline decoration-1 underline-offset-2 decoration-gray-400"
+            >
+              {part.content}
+            </span>
+          );
+        } else {
+          // 普通文本 - 如果前后都没有商品卡片，包裹在 <p> 中；否则只返回 span
+          const trimmedContent = part.content.trim();
+          if (!trimmedContent) return null;
+
+          // 检查是否是独立的文本段落（前后都没有商品）
+          const hasPrevProduct = index > 0 && parts[index - 1].type === 'product';
+          const hasNextProduct = index < parts.length - 1 && parts[index + 1].type === 'product';
+
+          if (!hasPrevProduct && !hasNextProduct && parts.length === 1) {
+            // 单独的文本，使用 <p>
+            return (
+              <p key={`text-${index}`} className="text-sm text-gray-700 leading-relaxed mb-2">
+                {trimmedContent}
+              </p>
+            );
+          }
+
+          // 混合内容，只用 span
+          return <span key={`text-${index}`}>{part.content}</span>;
+        }
+      })}
+    </>
+  );
+}
+
 // 通用SKU检测和渲染函数
-const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false): React.ReactNode => {
+const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false, productImageMode: 'mock' | 'shimmer' = 'mock'): React.ReactNode => {
   // 将children转换为字符串来检查
   const childrenString = React.Children.toArray(children)
     .map(child => {
@@ -22,6 +155,11 @@ const renderWithSkuCards = (children: React.ReactNode, showDebugBounds = false):
       return '';
     })
     .join('');
+
+  // 优先检查是否包含新格式的token（使用新的分隔符）
+  if (childrenString.includes('⟪PRODUCT_CARD_') || childrenString.includes('⟪CLICK_TEXT_')) {
+    return renderProcessedText(childrenString, showDebugBounds, productImageMode);
+  }
 
   // 检查是否包含sku_id格式的链接，支持可选的价格与图片URL参数：[title](<sku_id>xxx</sku_id>)[price][img_url]
   const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(?:\[([^\]]+)\])?(?:\[(https?:\/\/[^\]]+)\])?/g;
@@ -108,6 +246,7 @@ interface MobilePreviewHTMLProps {
   canvasViewMode?: 'single' | 'full'; // 画布模式下的内部视图模式
   showSidebar?: boolean; // 侧边栏显示状态，用于计算可用空间
   sidebarWidth?: number; // 侧边栏宽度百分比，用于精确计算缩放
+  productImageMode?: 'mock' | 'shimmer'; // 商品卡片图片显示模式
   // 画布控制回调
   onScaleChange?: (scale: number) => void;
   onResetView?: () => void;
@@ -127,6 +266,7 @@ export default function MobilePreviewHTML({
   canvasViewMode = 'single',
   showSidebar = true,
   sidebarWidth = 50,
+  productImageMode = 'mock',
   onScaleChange,
   onResetView,
   onFitToView
@@ -398,24 +538,24 @@ export default function MobilePreviewHTML({
                       <span className="ml-2 text-gray-500 text-sm">AI正在分析中...</span>
                     </div>
                   ) : (
-                    <div className={`space-y-4 ${showDebugBounds ? 'border border-red-300 bg-red-50 p-2' : ''}`}> 
+                    <div className={`space-y-4 ${showDebugBounds ? 'border border-red-300 bg-red-50 p-2' : ''}`}>
                       {markdownContent ? (
-                        <ReactMarkdown 
+                        <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             h1: ({ children }) => (
                               <h1 className="text-xl font-bold text-gray-900 mb-2">
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </h1>
                             ),
                             h2: ({ children }) => (
                               <h2 className="text-lg font-semibold text-gray-800 mb-1.5">
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </h2>
                             ),
                             h3: ({ children }) => (
                               <h3 className="text-base font-semibold text-gray-800 mb-1.5">
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </h3>
                             ),
                             p: ({ children }: { children?: React.ReactNode }) => {
@@ -429,18 +569,13 @@ export default function MobilePreviewHTML({
                                   return '';
                                 })
                                 .join('');
-                              
-                              console.log('Paragraph children:', children);
-                              console.log('Paragraph string:', childrenString);
-                              
+
                               // 检查是否包含sku_id格式的链接，支持可选的价格与图片URL参数：[title](<sku_id>xxx</sku_id>)[price][img_url]
                               const skuLinkRegex = /\[([^\]]+)\]\(<sku_id>([A-Za-z0-9_]+)<\/sku_id>\)(?:\[([^\]]+)\])?(?:\[(https?:\/\/[^\]]+)\])?/g;
 
                               const matches = childrenString.match(skuLinkRegex);
 
                               if (matches && matches.length > 0) {
-                                console.log('Found SKU links in paragraph:', matches);
-
                                 // 解析每个匹配项
                                 type SkuPart = { type: 'sku_card'; skuId: string; title: string; customPrice?: string; imageUrl?: string };
                                 type TextPart = { type: 'text'; content: string };
@@ -507,7 +642,21 @@ export default function MobilePreviewHTML({
                                   </>
                                 );
                               }
-                              
+
+                              // 检查是否包含新格式的token（使用新的分隔符）
+                              if (childrenString.includes('⟪PRODUCT_CARD_') || childrenString.includes('⟪CLICK_TEXT_')) {
+                                // 如果包含商品卡片，不能用 <p> 包裹（HTML不允许 <p> 内有 <div>）
+                                if (childrenString.includes('⟪PRODUCT_CARD_')) {
+                                  return renderProcessedText(childrenString, showDebugBounds, productImageMode);
+                                }
+                                // 只有 ClickText 时可以用 <p> 包裹
+                                return (
+                                  <p className="text-sm text-gray-700 leading-relaxed mb-2">
+                                    {renderProcessedText(childrenString, showDebugBounds, productImageMode)}
+                                  </p>
+                                );
+                              }
+
                               // 普通段落正常处理
                               return <p className="text-sm text-gray-700 leading-relaxed mb-2">{children}</p>;
                             },
@@ -523,12 +672,12 @@ export default function MobilePreviewHTML({
                             ),
                             li: ({ children }) => (
                               <li className="text-sm text-gray-700 leading-relaxed" style={{ display: 'list-item', marginBottom: 0, paddingBottom: 0, paddingLeft: '4px' }}>
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </li>
                             ),
                             blockquote: ({ children }) => (
                               <div className="text-sm text-gray-600 italic mb-2">
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </div>
                             ),
                             code: ({ children }) => {
@@ -552,22 +701,22 @@ export default function MobilePreviewHTML({
                             tr: ({ children }) => <tr>{children}</tr>,
                             th: ({ children }) => (
                               <th className="px-3 py-2 text-left font-semibold text-gray-900 border-b border-gray-300 border-r border-gray-200">
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </th>
                             ),
                             td: ({ children }) => (
                               <td className="px-3 py-2 text-gray-700 border-b border-gray-200 border-r border-gray-200">
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </td>
                             ),
                             strong: ({ children }) => (
                               <strong className="font-semibold">
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </strong>
                             ),
                             em: ({ children }) => (
                               <em className="italic">
-                                {renderWithSkuCards(children, showDebugBounds)}
+                                {renderWithSkuCards(children, showDebugBounds, productImageMode)}
                               </em>
                             ),
                             a: ({ href, children }) => {
@@ -576,7 +725,7 @@ export default function MobilePreviewHTML({
                             },
                           }}
                         >
-{markdownContent}
+{preprocessMarkdown(markdownContent)}
                         </ReactMarkdown>
                       ) : (
                         <div className="text-gray-500 text-sm text-center py-4">

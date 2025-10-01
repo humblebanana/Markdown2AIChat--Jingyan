@@ -25,6 +25,9 @@ export default function Home() {
   const [showDebugBounds, setShowDebugBounds] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
 
+  // 商品卡片图片显示模式：'mock' = 模拟图片（使用img_url），'shimmer' = 全部显示shimmer特效
+  const [productImageMode, setProductImageMode] = useState<'mock' | 'shimmer'>('mock');
+
   // 截图状态
   const [isSaving, setIsSaving] = useState(false);
   
@@ -577,8 +580,6 @@ export default function Home() {
             一键将 Markdown 渲染为高保真移动端AI Chatbot聊天页面，所见即所得、可直接导出
             </p>
           </div>
-          
-          
         </div>
       </header>
 
@@ -603,6 +604,8 @@ export default function Home() {
               isProcessing={isProcessing}
               showSidebar={showSidebar}
               onToggleSidebar={() => setShowSidebar(!showSidebar)}
+              productImageMode={productImageMode}
+              onProductImageModeChange={setProductImageMode}
             />
           )}
         </div>
@@ -828,6 +831,7 @@ export default function Home() {
               canvasViewMode={canvasViewMode}
               showSidebar={showSidebar}
               sidebarWidth={sidebarWidth}
+              productImageMode={productImageMode}
               onScaleChange={setCanvasScale}
               onResetView={() => {}}
               onFitToView={() => {}}
